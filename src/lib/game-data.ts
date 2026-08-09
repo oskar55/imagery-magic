@@ -27,7 +27,7 @@ export interface Quest {
   category: Categoria;
   difficulty: Dificultad;
   isCompleted: boolean;
-  completedAt?: string;
+  completedAt?: string | undefined;
   xpReward: number;
   goldReward: number;
   archived: boolean;

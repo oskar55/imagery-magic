@@ -3,7 +3,7 @@
  * al estilo Warcraft / Hearthstone. Todo es SVG dibujado a mano (sin librerías).
  */
 
-type P = { className?: string; title?: string };
+type P = { className?: string | undefined; title?: string | undefined };
 
 const OUT = "#1b1109";
 
@@ -150,7 +150,6 @@ export function BannerIcon({ className, title }: P) {
     <Svg className={className} title={title}>
       <path d="M10 5h28v26l-14 8-14-8z" fill="#2f5fa8" stroke={OUT} strokeWidth="2.5" strokeLinejoin="round" />
       <path d="M24 5v34" stroke="#1e3f74" strokeWidth="2" opacity=".7" />
-      <path d="M8 3h32l-3 5H11z" fill="#e0b githubs" />
       <path d="M7 3h34l-3 5H10z" fill="#e2b64b" stroke={OUT} strokeWidth="2.5" strokeLinejoin="round" />
       <path d="M24 14l3.5 6.5L34 22l-5 4.5 1.2 6.5L24 30l-6.2 3 1.2-6.5L14 22l6.5-1.5z" fill="#f2d489" stroke={OUT} strokeWidth="2" strokeLinejoin="round" />
       <path d="M22 40h4v5h-4z" fill="#7a4a20" stroke={OUT} strokeWidth="2" />
@@ -189,4 +188,4 @@ export function QuillIcon({ className, title }: P) {
   );
 }
 
-export type GameIcon = (p: P) => JSX.Element;
+export type GameIcon = (p: P) => React.ReactElement;

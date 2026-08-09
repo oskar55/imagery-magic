@@ -3,7 +3,8 @@ import { AppShell } from "@/components/AppShell";
 import { CATEGORIAS, HEROE } from "@/lib/game-data";
 import emblem from "@/assets/emblem.png.asset.json";
 import chest from "@/assets/chest.png.asset.json";
-import { Coins, Flame, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
+import { GoldCoinIcon, StreakFlameIcon } from "@/components/icons/GameIcons";
 
 export const Route = createFileRoute("/personaje")({
   head: () => ({
@@ -29,7 +30,7 @@ function Personaje() {
 
   return (
     <AppShell>
-      <section className="panel-stone relative mb-5 overflow-hidden p-5 text-center">
+      <section className="panel-carved carved-rivets relative mb-5 overflow-hidden p-5 text-center">
         <img
           src={emblem.url}
           alt="Escudo heráldico del héroe"
@@ -46,7 +47,7 @@ function Personaje() {
               label: "Oro",
               value: (
                 <span className="inline-flex items-center gap-1 text-gold">
-                  <Coins className="size-4" /> {HEROE.oro}
+                  <GoldCoinIcon className="size-5" /> {HEROE.oro}
                 </span>
               ),
               cls: "",
@@ -55,7 +56,7 @@ function Personaje() {
               label: "Racha",
               value: (
                 <span className="inline-flex items-center gap-1 text-ember">
-                  <Flame className="size-4" /> {HEROE.racha}
+                  <StreakFlameIcon className="size-5" /> {HEROE.racha}
                 </span>
               ),
               cls: "",
@@ -74,21 +75,16 @@ function Personaje() {
       <h3 className="mb-2 font-display text-sm uppercase tracking-[0.18em] text-gold">
         Atributos
       </h3>
-      <div className="panel-stone space-y-3 p-4">
+      <div className="panel-carved carved-rivets space-y-3 p-4">
         {HEROE.atributos.map((a) => {
           const cat = CATEGORIAS[a.categoria];
           const Icon = cat.icon;
           return (
             <div key={a.nombre} className="flex items-center gap-3">
               <div
-                className="grid size-9 shrink-0 place-items-center rounded-md border-2"
-                style={{
-                  borderColor: "color-mix(in oklab, var(--gold) 55%, black)",
-                  backgroundImage:
-                    "radial-gradient(circle at 30% 25%, oklch(0.4 0.05 62), oklch(0.2 0.03 60))",
-                }}
+                className="slot-forged grid size-10 shrink-0 place-items-center"
               >
-                <Icon className="size-4 text-gold-bright" strokeWidth={1.75} />
+                <Icon className="size-7" title={cat.label} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between">
@@ -123,8 +119,8 @@ function Personaje() {
             key={t.nombre}
             className={
               t.desbloqueado
-                ? "panel-stone flex items-center gap-2 p-3 text-xs text-parchment"
-                : "panel-stone flex items-center gap-2 p-3 text-xs text-muted-foreground opacity-60"
+                ? "panel-carved flex items-center gap-2 p-3 text-xs text-parchment"
+                : "panel-carved flex items-center gap-2 p-3 text-xs text-muted-foreground opacity-60"
             }
           >
             {!t.desbloqueado && <Lock className="size-3.5 shrink-0" />}
@@ -133,7 +129,7 @@ function Personaje() {
         ))}
       </div>
 
-      <section className="panel-stone mt-6 flex items-center gap-4 p-4">
+      <section className="panel-carved carved-rivets mt-6 flex items-center gap-4 p-4">
         <img src={chest.url} alt="Cofre de recompensas" className="size-16 rounded-md" />
         <div>
           <h3 className="font-display text-sm text-gilded">Cofre semanal</h3>

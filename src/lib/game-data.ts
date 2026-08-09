@@ -1,12 +1,12 @@
-import type { LucideIcon } from "lucide-react";
 import {
-  Dumbbell,
-  BookOpen,
-  Home,
-  Users,
-  HeartPulse,
-  Palette,
-} from "lucide-react";
+  ForgeHammerIcon,
+  GrimoireIcon,
+  HearthIcon,
+  BannerIcon,
+  PotionIcon,
+  QuillIcon,
+  type GameIcon,
+} from "@/components/icons/GameIcons";
 
 export type Categoria =
   | "entrenamiento"
@@ -36,14 +36,14 @@ export interface Quest {
 
 export const CATEGORIAS: Record<
   Categoria,
-  { label: string; atributo: string; icon: LucideIcon }
+  { label: string; atributo: string; icon: GameIcon }
 > = {
-  entrenamiento: { label: "Entrenamiento", atributo: "Fuerza", icon: Dumbbell },
-  estudio: { label: "Estudio", atributo: "Inteligencia", icon: BookOpen },
-  hogar: { label: "Hogar", atributo: "Disciplina", icon: Home },
-  social: { label: "Social", atributo: "Carisma", icon: Users },
-  salud: { label: "Salud", atributo: "Vitalidad", icon: HeartPulse },
-  creatividad: { label: "Creatividad", atributo: "Sabiduría", icon: Palette },
+  entrenamiento: { label: "Entrenamiento", atributo: "Fuerza", icon: ForgeHammerIcon },
+  estudio: { label: "Estudio", atributo: "Inteligencia", icon: GrimoireIcon },
+  hogar: { label: "Hogar", atributo: "Disciplina", icon: HearthIcon },
+  social: { label: "Social", atributo: "Carisma", icon: BannerIcon },
+  salud: { label: "Salud", atributo: "Vitalidad", icon: PotionIcon },
+  creatividad: { label: "Creatividad", atributo: "Sabiduría", icon: QuillIcon },
 };
 
 export const DIFICULTADES: Record<

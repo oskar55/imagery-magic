@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import emblem from "@/assets/emblem.png.asset.json";
-import { Coins, Flame } from "lucide-react";
+import { GoldCoinIcon, StreakFlameIcon } from "@/components/icons/GameIcons";
 import { HEROE } from "@/lib/game-data";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -45,11 +45,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {HEROE.xp} / {HEROE.xpSiguienteNivel} XP
               </span>
               <span className="flex items-center gap-3">
-                <span className="flex items-center gap-1 text-gold">
-                  <Coins className="size-3.5" /> {HEROE.oro}
+                <span className="reward-chip text-gold-bright">
+                  <GoldCoinIcon className="size-4" /> {HEROE.oro}
                 </span>
-                <span className="flex items-center gap-1 text-ember">
-                  <Flame className="size-3.5" /> {HEROE.racha}
+                <span className="reward-chip text-ember">
+                  <StreakFlameIcon className="size-4" /> {HEROE.racha}
                 </span>
               </span>
             </div>

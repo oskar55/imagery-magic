@@ -1,5 +1,6 @@
-import { Check, Coins, Sparkles, Repeat, Scroll } from "lucide-react";
+import { Check, Repeat, Scroll } from "lucide-react";
 import { CATEGORIAS, DIFICULTADES, type Quest } from "@/lib/game-data";
+import { GoldCoinIcon, XpCrystalIcon } from "@/components/icons/GameIcons";
 
 export function QuestCard({
   quest,
@@ -14,31 +15,26 @@ export function QuestCard({
 
   return (
     <article
-      className="panel-stone relative overflow-hidden p-3"
+      className="panel-carved carved-rivets relative overflow-hidden p-3"
       style={{
         borderColor: quest.isCompleted
-          ? "color-mix(in oklab, var(--leaf) 55%, var(--border))"
+          ? "color-mix(in oklab, var(--leaf) 45%, oklch(0.28 0.04 58))"
           : undefined,
       }}
     >
       <span
-        className="absolute inset-y-0 left-0 w-1.5"
-        style={{ background: dif.color, opacity: 0.85 }}
+        className="absolute inset-y-1 left-0 w-1.5"
+        style={{
+          background: dif.color,
+          opacity: 0.9,
+          clipPath: "polygon(0 0, 100% 6px, 100% calc(100% - 6px), 0 100%)",
+        }}
         aria-hidden
       />
 
-      <div className="flex items-start gap-3 pl-2">
-        {/* Ranura de ícono estilo ítem */}
-        <div
-          className="grid size-12 shrink-0 place-items-center rounded-md border-2"
-          style={{
-            borderColor: "color-mix(in oklab, var(--gold) 60%, black)",
-            backgroundImage:
-              "radial-gradient(circle at 30% 25%, oklch(0.42 0.05 62), oklch(0.2 0.03 60))",
-            boxShadow: "inset 0 2px 6px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.4)",
-          }}
-        >
-          <Icon className="size-6 text-gold-bright" strokeWidth={1.75} />
+      <div className="flex items-start gap-3 pl-2.5">
+        <div className="slot-forged grid size-12 shrink-0 place-items-center">
+          <Icon className="size-8" title={cat.label} />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -56,7 +52,7 @@ export function QuestCard({
               {Array.from({ length: dif.runas }).map((_, i) => (
                 <span
                   key={i}
-                  className="size-1.5 rotate-45"
+                  className="size-1.5 rotate-45 border border-[oklch(0.14_0.02_50)]"
                   style={{ background: dif.color }}
                 />
               ))}
@@ -70,7 +66,7 @@ export function QuestCard({
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-            <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-secondary px-1.5 py-0.5 text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-[2px] border border-[oklch(0.16_0.02_52)] bg-secondary px-1.5 py-0.5 text-muted-foreground shadow-[inset_0_1px_0_oklch(1_0_0/10%)]">
               {quest.type === "diaria" ? (
                 <Repeat className="size-3" />
               ) : (
@@ -78,14 +74,14 @@ export function QuestCard({
               )}
               {quest.type === "diaria" ? "Diaria" : "Única"}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-secondary px-1.5 py-0.5 text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-[2px] border border-[oklch(0.16_0.02_52)] bg-secondary px-1.5 py-0.5 text-muted-foreground shadow-[inset_0_1px_0_oklch(1_0_0/10%)]">
               {cat.label} · {cat.atributo}
             </span>
-            <span className="inline-flex items-center gap-1 text-leaf">
-              <Sparkles className="size-3" /> {quest.xpReward} XP
+            <span className="reward-chip text-leaf">
+              <XpCrystalIcon className="size-4" /> {quest.xpReward} XP
             </span>
-            <span className="inline-flex items-center gap-1 text-gold">
-              <Coins className="size-3" /> {quest.goldReward}
+            <span className="reward-chip text-gold-bright">
+              <GoldCoinIcon className="size-4" /> {quest.goldReward}
             </span>
           </div>
         </div>
@@ -101,10 +97,11 @@ export function QuestCard({
           style={
             quest.isCompleted
               ? {
-                  borderColor: "color-mix(in oklab, var(--leaf) 70%, black)",
+                  borderColor: "oklch(0.16 0.02 50)",
                   background:
-                    "radial-gradient(circle at 35% 25%, oklch(0.55 0.14 145), oklch(0.32 0.08 145))",
-                  boxShadow: "0 0 14px color-mix(in oklab, var(--leaf) 45%, transparent)",
+                    "radial-gradient(circle at 35% 25%, oklch(0.55 0.14 145), oklch(0.28 0.07 145))",
+                  boxShadow:
+                    "0 0 14px color-mix(in oklab, var(--leaf) 40%, transparent), inset 0 2px 5px oklch(0 0 0 / 55%)",
                 }
               : undefined
           }

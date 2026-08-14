@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as NuevaMisionRouteImport } from './routes/nueva-mision'
 import { Route as PersonajeRouteImport } from './routes/personaje'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NuevaMisionRoute = NuevaMisionRouteImport.update({
+  id: '/nueva-mision',
+  path: '/nueva-mision',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PersonajeRoute = PersonajeRouteImport.update({
@@ -25,27 +31,31 @@ const PersonajeRoute = PersonajeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/nueva-mision': typeof NuevaMisionRoute
   '/personaje': typeof PersonajeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/nueva-mision': typeof NuevaMisionRoute
   '/personaje': typeof PersonajeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/nueva-mision': typeof NuevaMisionRoute
   '/personaje': typeof PersonajeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/personaje'
+  fullPaths: '/' | '/nueva-mision' | '/personaje'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/personaje'
-  id: '__root__' | '/' | '/personaje'
+  to: '/' | '/nueva-mision' | '/personaje'
+  id: '__root__' | '/' | '/nueva-mision' | '/personaje'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  NuevaMisionRoute: typeof NuevaMisionRoute
   PersonajeRoute: typeof PersonajeRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nueva-mision': {
+      id: '/nueva-mision'
+      path: '/nueva-mision'
+      fullPath: '/nueva-mision'
+      preLoaderRoute: typeof NuevaMisionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/personaje': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  NuevaMisionRoute: NuevaMisionRoute,
   PersonajeRoute: PersonajeRoute,
 }
 export const routeTree = rootRouteImport

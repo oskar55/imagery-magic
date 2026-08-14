@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { QuestCard } from "@/components/QuestCard";
@@ -84,9 +84,13 @@ function Misiones() {
         </>
       )}
 
-      <button className="bevel-gold mt-6 flex w-full items-center justify-center gap-2 rounded-md py-3 font-display text-sm tracking-wide">
+      <Link
+        to="/nueva-mision"
+        className="bevel-gold mt-6 flex w-full items-center justify-center gap-2 rounded-md py-3 font-display text-sm tracking-wide"
+      >
         <Plus className="size-4" strokeWidth={3} /> Nueva misión
-      </button>
+      </Link>
+
     </AppShell>
   );
 }

@@ -27,6 +27,7 @@ export const Route = createFileRoute("/")({
 
 function Misiones() {
   const [quests, setQuests] = useState<Quest[]>(QUESTS);
+  const [vista, setVista] = useState<"lista" | "mapa">("lista");
 
   const toggle = (id: string) =>
     setQuests((qs) =>
@@ -52,12 +53,34 @@ function Misiones() {
 
   return (
     <AppShell>
+      <div className="mb-4 grid grid-cols-2 gap-1.5 rounded-md border border-border bg-secondary p-1">
+        {(["lista", "mapa"] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setVista(v)}
+            aria-pressed={vista === v}
+            className={
+              vista === v
+                ? "bevel-gold rounded-[4px] py-2.5 font-display text-sm tracking-wide transition-all duration-200"
+                : "rounded-[4px] py-2.5 font-display text-sm tracking-wide text-muted-foreground transition-all duration-200"
+            }
+          >
+            {v === "lista" ? "Lista" : "Mapa"}
+          </button>
+        ))}
+      </div>
+
+      {vista === "mapa" ? (
+        <QuestMap quests={quests} onToggle={toggle} />
+      ) : (
+        <div className="animate-in fade-in duration-300">
       <section className="panel-parchment mb-5 px-4 py-3 text-center">
         <h2 className="font-display text-lg tracking-wide">Tablón de Misiones</h2>
         <p className="mt-0.5 text-xs opacity-75">
           {activas.length} pendientes · {completadas.length} cumplidas hoy
         </p>
       </section>
+
 
       <h3 className="mb-2 font-display text-sm uppercase tracking-[0.18em] text-gold">
         En curso

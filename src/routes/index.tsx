@@ -113,7 +113,9 @@ function Misiones() {
       >
         <Plus className="size-4" strokeWidth={3} /> Nueva misión
       </Link>
-
+        </div>
+      )}
     </AppShell>
+
   );
 }

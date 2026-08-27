@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { QuestCard } from "@/components/QuestCard";
+import { QuestMap } from "@/components/QuestMap";
 import { QUESTS, type Quest } from "@/lib/game-data";
 import { Plus } from "lucide-react";
 

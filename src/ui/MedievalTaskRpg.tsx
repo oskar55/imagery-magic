@@ -6,9 +6,21 @@
  * fácil de exportar/portar. Los estilos viven en src/styles.css.
  */
 
-import { useMemo, useState } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
-import { Check, ChevronLeft, Lock, Plus, Repeat, Scroll, X } from "lucide-react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  Check,
+  ChevronLeft,
+  Info,
+  Lock,
+  Plus,
+  Repeat,
+  RotateCcw,
+  Scroll,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 import emblem from "@/assets/emblem-clean.png.asset.json";
 import chest from "@/assets/chest.png.asset.json";
 import mapBg from "@/assets/map-bg.jpg.asset.json";
@@ -368,6 +380,173 @@ export const HEROE = {
     { nombre: "Voz del Salón", desbloqueado: false },
   ],
 };
+
+
+/* ==================================================================
+ * 2b. Estado del juego — store compartido (persistente, sin backend)
+ * ================================================================== */
+
+export interface EstadoJuego {
+  quests: Quest[];
+  nivel: number;
+  xp: number;
+  oro: number;
+  racha: number;
+  atributos: Record<Categoria, number>;
+  animaciones: boolean;
+}
+
+export const xpNecesaria = (nivel: number) => 200 + nivel * 180;
+
+const ATRIB_INICIAL: Record<Categoria, number> = {
+  entrenamiento: 24,
+  estudio: 31,
+  hogar: 19,
+  social: 14,
+  salud: 27,
+  creatividad: 16,
+};
+
+const ESTADO_INICIAL: EstadoJuego = {
+  quests: QUESTS,
+  nivel: HEROE.nivel,
+  xp: HEROE.xp,
+  oro: HEROE.oro,
+  racha: HEROE.racha,
+  atributos: ATRIB_INICIAL,
+  animaciones: true,
+};
+
+const CLAVE = "mtrpg-estado-v1";
+
+let estado: EstadoJuego = ESTADO_INICIAL;
+const oyentes = new Set<() => void>();
+
+function emitir() {
+  oyentes.forEach((f) => f());
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(CLAVE, JSON.stringify(estado));
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  }
+}
+
+function suscribir(f: () => void) {
+  oyentes.add(f);
+  return () => oyentes.delete(f);
+}
+
+let hidratado = false;
+function hidratar() {
+  if (hidratado || typeof window === "undefined") return;
+  hidratado = true;
+  try {
+    const raw = window.localStorage.getItem(CLAVE);
+    if (raw) {
+      const prev = JSON.parse(raw) as Partial<EstadoJuego>;
+      estado = { ...estado, ...prev, atributos: { ...ATRIB_INICIAL, ...prev.atributos } };
+      oyentes.forEach((f) => f());
+    }
+  } catch {
+    /* estado corrupto: se ignora */
+  }
+}
+
+export function useJuego() {
+  useEffect(hidratar, []);
+  return useSyncExternalStore(
+    suscribir,
+    () => estado,
+    () => ESTADO_INICIAL,
+  );
+}
+
+export interface ResultadoCompletar {
+  xp: number;
+  oro: number;
+  subioNivel: boolean;
+  nivel: number;
+}
+
+export function completarMision(id: string): ResultadoCompletar | null {
+  const q = estado.quests.find((x) => x.id === id);
+  if (!q) return null;
+
+  if (q.isCompleted) {
+    // Filosofía cero castigos: desmarcar NO retira XP ni oro ya ganados.
+    estado = {
+      ...estado,
+      quests: estado.quests.map((x) =>
+        x.id === id ? { ...x, isCompleted: false, completedAt: undefined } : x,
+      ),
+    };
+    emitir();
+    return null;
+  }
+
+  let nivel = estado.nivel;
+  let xp = estado.xp + q.xpReward;
+  let subioNivel = false;
+  while (xp >= xpNecesaria(nivel)) {
+    xp -= xpNecesaria(nivel);
+    nivel += 1;
+    subioNivel = true;
+  }
+
+  estado = {
+    ...estado,
+    nivel,
+    xp,
+    oro: estado.oro + q.goldReward,
+    atributos: {
+      ...estado.atributos,
+      [q.category]: (estado.atributos[q.category] ?? 0) + 1,
+    },
+    quests: estado.quests.map((x) =>
+      x.id === id ? { ...x, isCompleted: true, completedAt: "hoy" } : x,
+    ),
+  };
+  emitir();
+  return { xp: q.xpReward, oro: q.goldReward, subioNivel, nivel };
+}
+
+export function crearMision(datos: {
+  title: string;
+  description?: string;
+  type: TipoMision;
+  category: Categoria;
+  difficulty: Dificultad;
+}) {
+  const premio = RECOMPENSAS[datos.difficulty];
+  const nueva: Quest = {
+    id: `q${Date.now()}`,
+    title: datos.title,
+    ...(datos.description ? { description: datos.description } : {}),
+    type: datos.type,
+    category: datos.category,
+    difficulty: datos.difficulty,
+    isCompleted: false,
+    xpReward: premio.xp,
+    goldReward: premio.oro,
+    archived: false,
+    order: estado.quests.length + 1,
+  };
+  estado = { ...estado, quests: [...estado.quests, nueva] };
+  emitir();
+  return nueva;
+}
+
+export function alternarAnimaciones() {
+  estado = { ...estado, animaciones: !estado.animaciones };
+  emitir();
+}
+
+export function reiniciarProgreso() {
+  estado = { ...ESTADO_INICIAL, animaciones: estado.animaciones };
+  emitir();
+}
 
 
 /* ==================================================================

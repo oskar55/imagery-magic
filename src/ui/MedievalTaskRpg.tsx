@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Check, ChevronLeft, Lock, Plus, Repeat, Scroll, X } from "lucide-react";
-import emblem from "@/assets/emblem.png.asset.json";
+import emblem from "@/assets/emblem-clean.png.asset.json";
 import chest from "@/assets/chest.png.asset.json";
 import mapBg from "@/assets/map-bg.jpg.asset.json";
 

@@ -6,10 +6,22 @@
  * fácil de exportar/portar. Los estilos viven en src/styles.css.
  */
 
-import { useMemo, useState } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
-import { Check, ChevronLeft, Lock, Plus, Repeat, Scroll, X } from "lucide-react";
-import emblem from "@/assets/emblem.png.asset.json";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  Check,
+  ChevronLeft,
+  Info,
+  Lock,
+  Plus,
+  Repeat,
+  RotateCcw,
+  Scroll,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import emblem from "@/assets/emblem-clean.png.asset.json";
 import chest from "@/assets/chest.png.asset.json";
 import mapBg from "@/assets/map-bg.jpg.asset.json";
 
@@ -368,6 +380,173 @@ export const HEROE = {
     { nombre: "Voz del Salón", desbloqueado: false },
   ],
 };
+
+
+/* ==================================================================
+ * 2b. Estado del juego — store compartido (persistente, sin backend)
+ * ================================================================== */
+
+export interface EstadoJuego {
+  quests: Quest[];
+  nivel: number;
+  xp: number;
+  oro: number;
+  racha: number;
+  atributos: Record<Categoria, number>;
+  animaciones: boolean;
+}
+
+export const xpNecesaria = (nivel: number) => 200 + nivel * 180;
+
+const ATRIB_INICIAL: Record<Categoria, number> = {
+  entrenamiento: 24,
+  estudio: 31,
+  hogar: 19,
+  social: 14,
+  salud: 27,
+  creatividad: 16,
+};
+
+const ESTADO_INICIAL: EstadoJuego = {
+  quests: QUESTS,
+  nivel: HEROE.nivel,
+  xp: HEROE.xp,
+  oro: HEROE.oro,
+  racha: HEROE.racha,
+  atributos: ATRIB_INICIAL,
+  animaciones: true,
+};
+
+const CLAVE = "mtrpg-estado-v1";
+
+let estado: EstadoJuego = ESTADO_INICIAL;
+const oyentes = new Set<() => void>();
+
+function emitir() {
+  oyentes.forEach((f) => f());
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(CLAVE, JSON.stringify(estado));
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  }
+}
+
+function suscribir(f: () => void) {
+  oyentes.add(f);
+  return () => oyentes.delete(f);
+}
+
+let hidratado = false;
+function hidratar() {
+  if (hidratado || typeof window === "undefined") return;
+  hidratado = true;
+  try {
+    const raw = window.localStorage.getItem(CLAVE);
+    if (raw) {
+      const prev = JSON.parse(raw) as Partial<EstadoJuego>;
+      estado = { ...estado, ...prev, atributos: { ...ATRIB_INICIAL, ...prev.atributos } };
+      oyentes.forEach((f) => f());
+    }
+  } catch {
+    /* estado corrupto: se ignora */
+  }
+}
+
+export function useJuego() {
+  useEffect(hidratar, []);
+  return useSyncExternalStore(
+    suscribir,
+    () => estado,
+    () => ESTADO_INICIAL,
+  );
+}
+
+export interface ResultadoCompletar {
+  xp: number;
+  oro: number;
+  subioNivel: boolean;
+  nivel: number;
+}
+
+export function completarMision(id: string): ResultadoCompletar | null {
+  const q = estado.quests.find((x) => x.id === id);
+  if (!q) return null;
+
+  if (q.isCompleted) {
+    // Filosofía cero castigos: desmarcar NO retira XP ni oro ya ganados.
+    estado = {
+      ...estado,
+      quests: estado.quests.map((x) =>
+        x.id === id ? { ...x, isCompleted: false, completedAt: undefined } : x,
+      ),
+    };
+    emitir();
+    return null;
+  }
+
+  let nivel = estado.nivel;
+  let xp = estado.xp + q.xpReward;
+  let subioNivel = false;
+  while (xp >= xpNecesaria(nivel)) {
+    xp -= xpNecesaria(nivel);
+    nivel += 1;
+    subioNivel = true;
+  }
+
+  estado = {
+    ...estado,
+    nivel,
+    xp,
+    oro: estado.oro + q.goldReward,
+    atributos: {
+      ...estado.atributos,
+      [q.category]: (estado.atributos[q.category] ?? 0) + 1,
+    },
+    quests: estado.quests.map((x) =>
+      x.id === id ? { ...x, isCompleted: true, completedAt: "hoy" } : x,
+    ),
+  };
+  emitir();
+  return { xp: q.xpReward, oro: q.goldReward, subioNivel, nivel };
+}
+
+export function crearMision(datos: {
+  title: string;
+  description?: string;
+  type: TipoMision;
+  category: Categoria;
+  difficulty: Dificultad;
+}) {
+  const premio = RECOMPENSAS[datos.difficulty];
+  const nueva: Quest = {
+    id: `q${Date.now()}`,
+    title: datos.title,
+    ...(datos.description ? { description: datos.description } : {}),
+    type: datos.type,
+    category: datos.category,
+    difficulty: datos.difficulty,
+    isCompleted: false,
+    xpReward: premio.xp,
+    goldReward: premio.oro,
+    archived: false,
+    order: estado.quests.length + 1,
+  };
+  estado = { ...estado, quests: [...estado.quests, nueva] };
+  emitir();
+  return nueva;
+}
+
+export function alternarAnimaciones() {
+  estado = { ...estado, animaciones: !estado.animaciones };
+  emitir();
+}
+
+export function reiniciarProgreso() {
+  estado = { ...ESTADO_INICIAL, animaciones: estado.animaciones };
+  emitir();
+}
 
 
 /* ==================================================================
@@ -874,36 +1053,122 @@ export function QuestMap({
  * 5. AppShell — cabecera + navegación
  * ================================================================== */
 
+export function LevelUpFx({ nivel, onEnd }: { nivel: number; onEnd: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onEnd, 2200);
+    return () => clearTimeout(t);
+  }, [onEnd]);
+
+  return (
+    <div
+      className="pointer-events-none fixed inset-0 z-50 grid place-items-center px-6"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="levelup-burst panel-parchment px-8 py-5 text-center">
+        <Sparkles className="mx-auto size-7" aria-hidden />
+        <p className="mt-1 font-display text-xl tracking-[0.08em]">¡Subiste de nivel!</p>
+        <p className="font-display text-3xl">Nv. {nivel}</p>
+        <p className="mt-1 text-xs opacity-75">Nuevo título disponible en tu personaje</p>
+      </div>
+    </div>
+  );
+}
+
+/** Anillo de progreso del día — feedback de avance en un vistazo. */
+export function AnilloProgreso({
+  hechas,
+  total,
+  size = 54,
+}: {
+  hechas: number;
+  total: number;
+  size?: number;
+}) {
+  const pct = total === 0 ? 0 : hechas / total;
+  const r = size / 2 - 5;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="oklch(0.16 0.02 55)"
+        strokeWidth={6}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="var(--gold-bright)"
+        strokeWidth={6}
+        strokeLinecap="round"
+        strokeDasharray={`${c * pct} ${c}`}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: "stroke-dasharray 500ms ease" }}
+      />
+      <text
+        x="50%"
+        y="53%"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={size * 0.3}
+        fill="var(--parchment)"
+        fontFamily="var(--font-display)"
+      >
+        {hechas}/{total}
+      </text>
+    </svg>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const pct = Math.round((HEROE.xp / HEROE.xpSiguienteNivel) * 100);
+  const juego = useJuego();
+  const meta = xpNecesaria(juego.nivel);
+  const pct = Math.min(100, Math.round((juego.xp / meta) * 100));
 
   const tabs = [
     { to: "/", label: "Misiones" },
     { to: "/personaje", label: "Personaje" },
+    { to: "/ajustes", label: "Ajustes" },
   ] as const;
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-md pb-28">
-      <header className="panel-stone sticky top-0 z-20 rounded-none border-x-0 border-t-0 px-4 py-3">
+    <div className="mx-auto min-h-screen w-full max-w-md pb-32">
+      <header className="panel-stone safe-top sticky top-0 z-20 rounded-none border-x-0 border-t-0 px-4 py-3">
         <div className="flex items-center gap-3">
-          <img
-            src={emblem.url}
-            alt="Emblema del héroe"
-            className="size-14 shrink-0 drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]"
-          />
+          <Link
+            to="/personaje"
+            aria-label="Ver ficha del personaje"
+            className="shrink-0 rounded-full p-0.5"
+          >
+            <img
+              src={emblem.url}
+              alt=""
+              className="size-14 drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]"
+            />
+          </Link>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
-              <h1 className="truncate font-display text-base text-gilded">
-                {HEROE.nombre}
-              </h1>
+              <h1 className="truncate font-display text-base text-gilded">{HEROE.nombre}</h1>
               <span className="font-display text-xs text-muted-foreground">
-                Nv. {HEROE.nivel}
+                Nv. {juego.nivel}
               </span>
             </div>
-            <div className="mt-1 h-3 overflow-hidden rounded-full border border-border bg-[oklch(0.16_0.02_60)] shadow-[inset_0_2px_5px_rgba(0,0,0,0.6)]">
+            <div
+              className="mt-1 h-3 overflow-hidden rounded-full border border-border bg-[oklch(0.16_0.02_60)] shadow-[inset_0_2px_5px_rgba(0,0,0,0.6)]"
+              role="progressbar"
+              aria-valuenow={pct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Progreso al nivel ${juego.nivel + 1}`}
+            >
               <div
-                className="h-full rounded-full"
+                className="xp-fill h-full rounded-full"
                 style={{
                   width: `${pct}%`,
                   backgroundImage: "var(--gradient-xp)",
@@ -913,14 +1178,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
               <span>
-                {HEROE.xp} / {HEROE.xpSiguienteNivel} XP
+                {juego.xp} / {meta} XP
               </span>
-              <span className="flex items-center gap-3">
+              <span className="flex items-center gap-2">
                 <span className="reward-chip text-gold-bright">
-                  <GoldCoinIcon className="size-4" /> {HEROE.oro}
+                  <GoldCoinIcon className="size-4" /> {juego.oro}
                 </span>
-                <span className="reward-chip text-ember">
-                  <StreakFlameIcon className="size-4" /> {HEROE.racha}
+                <span className="reward-chip text-ember" title="Racha de días activos">
+                  <StreakFlameIcon className="size-4" /> {juego.racha}
                 </span>
               </span>
             </div>
@@ -930,18 +1195,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="px-4 pt-5">{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-md">
-        <div className="panel-stone grid grid-cols-2 gap-2 rounded-none border-x-0 border-b-0 p-2">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-md"
+        aria-label="Navegación principal"
+      >
+        <div className="panel-stone safe-bottom grid grid-cols-3 gap-2 rounded-none border-x-0 border-b-0 p-2">
           {tabs.map((t) => {
             const active = pathname === t.to;
             return (
               <Link
                 key={t.to}
                 to={t.to}
+                aria-current={active ? "page" : undefined}
                 className={
                   active
-                    ? "bevel-gold rounded-md py-2.5 text-center font-display text-sm tracking-wide"
-                    : "rounded-md border border-border bg-secondary py-2.5 text-center font-display text-sm tracking-wide text-muted-foreground"
+                    ? "bevel-gold grid min-h-[48px] place-items-center rounded-md text-center font-display text-sm tracking-wide"
+                    : "grid min-h-[48px] place-items-center rounded-md border border-border bg-secondary text-center font-display text-sm tracking-wide text-muted-foreground"
                 }
               >
                 {t.label}
@@ -960,43 +1229,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
  * ================================================================== */
 
 export function Misiones() {
-  const [quests, setQuests] = useState<Quest[]>(QUESTS);
+  const juego = useJuego();
   const [vista, setVista] = useState<"lista" | "mapa">("lista");
+  const [subida, setSubida] = useState<number | null>(null);
 
-  const toggle = (id: string) =>
-    setQuests((qs) =>
-      qs.map((q) =>
-        q.id === id
-          ? {
-              ...q,
-              isCompleted: !q.isCompleted,
-              completedAt: !q.isCompleted ? "hoy" : undefined,
-            }
-          : q,
-      ),
-    );
+  const toggle = (id: string) => {
+    const r = completarMision(id);
+    if (r) {
+      toast.success("¡Misión cumplida!", {
+        description: `+${r.xp} XP · +${r.oro} oro`,
+      });
+      if (r.subioNivel && estadoAnimaciones()) setSubida(r.nivel);
+    } else {
+      toast("Misión reabierta", {
+        description: "Conservas la XP y el oro ya ganados.",
+      });
+    }
+  };
 
-  const activas = useMemo(
-    () => quests.filter((q) => !q.archived && !q.isCompleted).sort((a, b) => a.order - b.order),
-    [quests],
+  const visibles = useMemo(
+    () => juego.quests.filter((q) => !q.archived).sort((a, b) => a.order - b.order),
+    [juego.quests],
   );
-  const completadas = useMemo(
-    () => quests.filter((q) => !q.archived && q.isCompleted).sort((a, b) => a.order - b.order),
-    [quests],
-  );
+  const activas = visibles.filter((q) => !q.isCompleted);
+  const completadas = visibles.filter((q) => q.isCompleted);
 
   return (
     <AppShell>
-      <div className="mb-4 grid grid-cols-2 gap-1.5 rounded-md border border-border bg-secondary p-1">
+      {subida !== null && <LevelUpFx nivel={subida} onEnd={() => setSubida(null)} />}
+
+      <div
+        className="mb-4 grid grid-cols-2 gap-1.5 rounded-md border border-border bg-secondary p-1"
+        role="tablist"
+        aria-label="Forma de ver las misiones"
+      >
         {(["lista", "mapa"] as const).map((v) => (
           <button
             key={v}
+            role="tab"
             onClick={() => setVista(v)}
-            aria-pressed={vista === v}
+            aria-selected={vista === v}
             className={
               vista === v
-                ? "bevel-gold rounded-[4px] py-2.5 font-display text-sm tracking-wide transition-all duration-200"
-                : "rounded-[4px] py-2.5 font-display text-sm tracking-wide text-muted-foreground transition-all duration-200"
+                ? "bevel-gold min-h-[44px] rounded-[4px] font-display text-sm tracking-wide transition-all duration-200"
+                : "min-h-[44px] rounded-[4px] font-display text-sm tracking-wide text-muted-foreground transition-all duration-200"
             }
           >
             {v === "lista" ? "Lista" : "Mapa"}
@@ -1004,55 +1280,86 @@ export function Misiones() {
         ))}
       </div>
 
-      {vista === "mapa" ? (
-        <QuestMap quests={quests} onToggle={toggle} />
-      ) : (
-        <div className="animate-in fade-in duration-300">
-      <section className="panel-parchment mb-5 px-4 py-3 text-center">
-        <h2 className="font-display text-lg tracking-wide">Tablón de Misiones</h2>
-        <p className="mt-0.5 text-xs opacity-75">
-          {activas.length} pendientes · {completadas.length} cumplidas hoy
-        </p>
+      {/* Meta del día — el gancho de gamificación diario */}
+      <section className="panel-carved carved-rivets mb-4 flex items-center gap-4 p-4">
+        <AnilloProgreso hechas={completadas.length} total={visibles.length} />
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-sm tracking-wide text-gilded">Meta de hoy</h2>
+          <p className="text-xs text-muted-foreground">
+            {activas.length === 0
+              ? "Jornada completa. Descansa, guerrero."
+              : `Te faltan ${activas.length} misiones para cerrar el día.`}
+          </p>
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-ember">
+            <StreakFlameIcon className="size-4" /> Racha de {juego.racha} días
+          </p>
+        </div>
       </section>
 
+      {vista === "mapa" ? (
+        <QuestMap quests={juego.quests} onToggle={toggle} />
+      ) : (
+        <div className="animate-in fade-in duration-300">
+          <section className="panel-parchment mb-5 px-4 py-3 text-center">
+            <h2 className="font-display text-lg tracking-wide">Tablón de Misiones</h2>
+            <p className="mt-0.5 text-xs opacity-75">
+              {activas.length} pendientes · {completadas.length} cumplidas hoy
+            </p>
+          </section>
 
-      <h3 className="mb-2 font-display text-sm uppercase tracking-[0.18em] text-gold">
-        En curso
-      </h3>
-      <div className="space-y-2.5">
-        {activas.map((q) => (
-          <QuestCard key={q.id} quest={q} onToggle={toggle} />
-        ))}
-      </div>
+          {activas.length > 0 ? (
+            <>
+              <h3 className="mb-2 font-display text-sm uppercase tracking-[0.18em] text-gold">
+                En curso
+              </h3>
+              <div className="space-y-2.5">
+                {activas.map((q) => (
+                  <QuestCard key={q.id} quest={q} onToggle={toggle} />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="panel-carved p-6 text-center">
+              <p className="font-display text-sm text-gilded">Tablón despejado</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Inscribe una misión nueva para seguir sumando XP mañana.
+              </p>
+            </div>
+          )}
 
-      {completadas.length > 0 && (
-        <>
-          <h3 className="mb-2 mt-6 font-display text-sm uppercase tracking-[0.18em] text-muted-foreground">
-            Cumplidas
-          </h3>
-          <div className="space-y-2.5 opacity-80">
-            {completadas.map((q) => (
-              <QuestCard key={q.id} quest={q} onToggle={toggle} />
-            ))}
-          </div>
-          <p className="mt-3 text-center text-[11px] text-muted-foreground">
-            Desmarcar una misión nunca quita XP ni oro ya ganados.
-          </p>
-        </>
+          {completadas.length > 0 && (
+            <>
+              <h3 className="mb-2 mt-6 font-display text-sm uppercase tracking-[0.18em] text-muted-foreground">
+                Cumplidas
+              </h3>
+              <div className="space-y-2.5 opacity-80">
+                {completadas.map((q) => (
+                  <QuestCard key={q.id} quest={q} onToggle={toggle} />
+                ))}
+              </div>
+              <p className="mt-3 text-center text-[11px] text-muted-foreground">
+                Desmarcar una misión nunca quita XP ni oro ya ganados.
+              </p>
+            </>
+          )}
+        </div>
       )}
 
       <Link
         to="/nueva-mision"
-        className="bevel-gold mt-6 flex w-full items-center justify-center gap-2 rounded-md py-3 font-display text-sm tracking-wide"
+        className="bevel-gold mt-6 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-md font-display text-sm tracking-wide"
       >
         <Plus className="size-4" strokeWidth={3} /> Nueva misión
       </Link>
-        </div>
-      )}
     </AppShell>
-
   );
 }
+
+function estadoAnimaciones() {
+  return prefiereAnimaciones;
+}
+
+let prefiereAnimaciones = true;
 
 
 /* ==================================================================
@@ -1060,7 +1367,15 @@ export function Misiones() {
  * ================================================================== */
 
 export function Personaje() {
-  const maxAttr = Math.max(...HEROE.atributos.map((a) => a.valor));
+  const juego = useJuego();
+  prefiereAnimaciones = juego.animaciones;
+  const valores = HEROE.atributos.map((a) => ({
+    ...a,
+    valor: juego.atributos[a.categoria] ?? a.valor,
+  }));
+  const maxAttr = Math.max(...valores.map((a) => a.valor));
+  const cumplidas = juego.quests.filter((q) => q.isCompleted).length;
+  const faltanCofre = Math.max(0, 5 - cumplidas);
 
   return (
     <AppShell>
@@ -1076,12 +1391,12 @@ export function Personaje() {
         </p>
         <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
           {[
-            { label: "Nivel", value: HEROE.nivel, cls: "text-parchment" },
+            { label: "Nivel", value: juego.nivel, cls: "text-parchment" },
             {
               label: "Oro",
               value: (
                 <span className="inline-flex items-center gap-1 text-gold">
-                  <GoldCoinIcon className="size-5" /> {HEROE.oro}
+                  <GoldCoinIcon className="size-5" /> {juego.oro}
                 </span>
               ),
               cls: "",
@@ -1090,7 +1405,7 @@ export function Personaje() {
               label: "Racha",
               value: (
                 <span className="inline-flex items-center gap-1 text-ember">
-                  <StreakFlameIcon className="size-5" /> {HEROE.racha}
+                  <StreakFlameIcon className="size-5" /> {juego.racha}
                 </span>
               ),
               cls: "",
@@ -1110,14 +1425,12 @@ export function Personaje() {
         Atributos
       </h3>
       <div className="panel-carved carved-rivets space-y-3 p-4">
-        {HEROE.atributos.map((a) => {
+        {valores.map((a) => {
           const cat = CATEGORIAS[a.categoria];
           const Icon = cat.icon;
           return (
             <div key={a.nombre} className="flex items-center gap-3">
-              <div
-                className="slot-forged grid size-10 shrink-0 place-items-center"
-              >
+              <div className="slot-forged grid size-10 shrink-0 place-items-center">
                 <Icon className="size-7" title={cat.label} />
               </div>
               <div className="min-w-0 flex-1">
@@ -1131,7 +1444,7 @@ export function Personaje() {
                 </div>
                 <div className="mt-1 h-2.5 overflow-hidden rounded-full border border-border bg-[oklch(0.16_0.02_60)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)]">
                   <div
-                    className="h-full rounded-full"
+                    className="xp-fill h-full rounded-full"
                     style={{
                       width: `${(a.valor / maxAttr) * 100}%`,
                       backgroundImage: "var(--gradient-gold)",
@@ -1164,13 +1477,100 @@ export function Personaje() {
       </div>
 
       <section className="panel-carved carved-rivets mt-6 flex items-center gap-4 p-4">
-        <img src={chest.url} alt="Cofre de recompensas" className="size-16 rounded-md" />
+        <img src={chest.url} alt="" className="size-16 rounded-md" />
         <div>
           <h3 className="font-display text-sm text-gilded">Cofre semanal</h3>
           <p className="text-xs text-muted-foreground">
-            Completa 5 misiones más para abrirlo. Nunca se pierde progreso.
+            {faltanCofre === 0
+              ? "Listo para abrir: recompensa fija de 100 XP y 50 oro."
+              : `Completa ${faltanCofre} misiones más para abrirlo.`}
+          </p>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Recompensa fija y sin azar: no hay sorteos ni compras.
           </p>
         </div>
+      </section>
+    </AppShell>
+  );
+}
+
+
+/* ==================================================================
+ * 7b. Pantalla: Ajustes y transparencia (/ajustes)
+ * ================================================================== */
+
+export function Ajustes() {
+  const juego = useJuego();
+
+  return (
+    <AppShell>
+      <h2 className="mb-3 font-display text-lg tracking-wide text-gilded">Ajustes</h2>
+
+      <section className="panel-carved carved-rivets mb-4 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-display text-sm text-parchment">Efectos y animaciones</h3>
+            <p className="text-xs text-muted-foreground">
+              Desactívalos si prefieres una experiencia más sobria o sensible al movimiento.
+            </p>
+          </div>
+          <button
+            onClick={alternarAnimaciones}
+            role="switch"
+            aria-checked={juego.animaciones}
+            aria-label="Activar efectos y animaciones"
+            className="relative h-8 w-14 shrink-0 rounded-full border-2 border-[oklch(0.18_0.02_54)] bg-[oklch(0.18_0.02_58)]"
+          >
+            <span
+              className="absolute top-0.5 size-6 rounded-full transition-all duration-200"
+              style={{
+                left: juego.animaciones ? "calc(100% - 1.6rem)" : "0.15rem",
+                backgroundImage: juego.animaciones
+                  ? "var(--gradient-gold)"
+                  : "linear-gradient(180deg, oklch(0.4 0.01 60), oklch(0.28 0.01 58))",
+              }}
+            />
+          </button>
+        </div>
+
+        <button
+          onClick={() => {
+            reiniciarProgreso();
+            toast("Progreso reiniciado", { description: "Volviste al tablón inicial." });
+          }}
+          className="mt-4 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-border bg-secondary font-display text-sm text-muted-foreground"
+        >
+          <RotateCcw className="size-4" /> Reiniciar progreso local
+        </button>
+      </section>
+
+      <section className="panel-parchment mb-4 p-4 text-sm">
+        <h3 className="flex items-center gap-2 font-display text-base">
+          <Info className="size-4" /> Privacidad
+        </h3>
+        <p className="mt-2 text-xs leading-relaxed">
+          Esta aplicación funciona por completo en tu dispositivo. No creamos cuentas, no
+          pedimos datos personales, no usamos rastreadores ni publicidad y no enviamos tu
+          información a ningún servidor. Tus misiones y tu progreso se guardan sólo en el
+          almacenamiento local del dispositivo y puedes borrarlos con “Reiniciar progreso
+          local” o desinstalando la app.
+        </p>
+        <h3 className="mt-4 font-display text-base">Uso responsable</h3>
+        <p className="mt-2 text-xs leading-relaxed">
+          No hay compras dentro de la app, ni suscripciones, ni mecánicas de azar: el oro y la
+          XP son puntos simbólicos sin valor monetario y las recompensas son siempre fijas y
+          conocidas de antemano. No se aplican castigos por incumplir una misión.
+        </p>
+        <h3 className="mt-4 font-display text-base">Contenido y edad</h3>
+        <p className="mt-2 text-xs leading-relaxed">
+          Contenido apto para todo público (3+ / 4+): temática de fantasía medieval sin
+          violencia, sin contenido generado por usuarios y sin funciones sociales. La
+          iconografía y los textos son originales de este proyecto y no representan a ninguna
+          marca de terceros.
+        </p>
+        <p className="mt-3 text-[11px] opacity-70">
+          Soporte: escríbenos desde la ficha de la tienda. Versión 1.0.0
+        </p>
       </section>
     </AppShell>
   );
